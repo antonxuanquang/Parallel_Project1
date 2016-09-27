@@ -17,7 +17,10 @@ int main(int argc, char *argv[]) {
    int      low_index;                 // start index of a process
    int      high_index;                // end index of a process
    int      size;                      // number of elements that a process holds
-   long     *numbers;
+   long     *numbers;                  // array of numbers from file
+   int      counter;                   // just a runner
+   long     local_sum;                 // hold a local sum
+   long     global_sum;
 
    MPI_Init(&argc, &argv);
 
@@ -57,35 +60,55 @@ int main(int argc, char *argv[]) {
    // printf("(%d) size: %d\n", p_id, size);
 
    // allocate memory to hold the number
-   number = malloc(size * sizeof(long));
+   numbers = malloc(size * sizeof(long));
 
-   if (number == NULL) {
+   if (numbers == NULL) {
       if (p_id == 0) printf ("Can't allocate memory\n");
       MPI_Finalize();
       exit (1);
    }
-   
+
    // distribute data to other processors
    if (p_id == 0) {
       int current_pid;
       int number;
-
+      
       for (current_pid = 0; current_pid < comm_size; current_pid++) {
          int low_index = (segment * current_pid) + ((current_pid < odd) ? current_pid : odd);
          int high_index = (segment * (current_pid + 1)) + ((current_pid < odd) ? current_pid : odd - 1);
          int size = high_index - low_index + 1;
 
-         // fread(&number, sizeof(int), 1, f_description)
+         // printf("(%d) low_index: %d\n", current_pid, low_index);
+         // printf("(%d) high_index: %d\n", current_pid, high_index);
+         // printf("(%d) size: %d\n", current_pid, size);
 
-         printf("(%d) low_index: %d\n", current_pid, low_index);
-         printf("(%d) high_index: %d\n", current_pid, high_index);
-         printf("(%d) size: %d\n", current_pid, size);
+         for (counter = 0; counter < size; counter++) {
+            fread(&number, sizeof(int), 1, f_description);
+
+            if (current_pid == 0) numbers[counter] = number;
+            else MPI_Send(&number, 1, MPI_INT, current_pid, 0, MPI_COMM_WORLD);
+         }
       }
-      
+   } else {
+      for (counter = 0; counter < size; counter++) {
+         MPI_Recv(&numbers[counter], 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      }
    }
 
+
+   // sum all the number in local array
+   local_sum = 0;
+   for (counter = 0; counter < size; counter++) {
+      local_sum += numbers[counter];
+   }
+
+   // reduce local sum to processor 0
+   MPI_Reduce(&local_sum, &global_sum, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
    
-   
+   // bug: after doing global_sum, there is a overflow on global_sum
+   if (p_id == 0) {
+      printf("(%d) sum: %ld\n", p_id, global_sum);
+   }
 
 
    elapsed_time += MPI_Wtime();
