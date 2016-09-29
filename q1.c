@@ -6,6 +6,8 @@
 
 #define MAXSTRING 100
 
+int collapse(int number);
+
 int main(int argc, char *argv[]) {
 
    int      p_id;                      // Processor ID
@@ -17,10 +19,10 @@ int main(int argc, char *argv[]) {
    int      low_index;                 // start index of a process
    int      high_index;                // end index of a process
    int      size;                      // number of elements that a process holds
-   long     *numbers;                  // array of numbers from file
+   int      *numbers;                  // array of numbers from file
    int      counter;                   // just a runner
-   long     local_sum;                 // hold a local sum
-   long     global_sum;
+   int      local_collapse;            // hold a local collapse
+   int      global_collapse;           // hold global collapse
 
    MPI_Init(&argc, &argv);
 
@@ -41,7 +43,7 @@ int main(int argc, char *argv[]) {
    strcpy(file_name, argv[1]);
    
    // get the first number
-   f_description = fopen("test1.dat", "r");
+   f_description = fopen(file_name, "r");
    
    fread(&global_size, sizeof(int), 1, f_description);
    // printf("global size: %d\n", global_size);
@@ -60,7 +62,7 @@ int main(int argc, char *argv[]) {
    // printf("(%d) size: %d\n", p_id, size);
 
    // allocate memory to hold the number
-   numbers = malloc(size * sizeof(long));
+   numbers = malloc(size * sizeof(int));
 
    if (numbers == NULL) {
       if (p_id == 0) printf ("Can't allocate memory\n");
@@ -84,7 +86,7 @@ int main(int argc, char *argv[]) {
 
          for (counter = 0; counter < size; counter++) {
             fread(&number, sizeof(int), 1, f_description);
-
+            // printf("(%d) number: %d\n", p_id, number);
             if (current_pid == 0) numbers[counter] = number;
             else MPI_Send(&number, 1, MPI_INT, current_pid, 0, MPI_COMM_WORLD);
          }
@@ -96,28 +98,36 @@ int main(int argc, char *argv[]) {
    }
 
 
-   // sum all the number in local array
-   local_sum = 0;
+   // collapse all the number in local array
+   local_collapse = 0;
    for (counter = 0; counter < size; counter++) {
-      local_sum += numbers[counter];
+      local_collapse = collapse(local_collapse + numbers[counter]);
+      // printf("(%d) number: %d, local_collapse: %d\n", p_id, numbers[counter], local_collapse);
    }
+   // printf("(%d) number: %d\n", p_id, local_collapse);
 
-   // reduce local sum to processor 0
-   MPI_Reduce(&local_sum, &global_sum, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+   MPI_Reduce(&local_collapse, &global_collapse, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
    
-   // bug: after doing global_sum, there is a overflow on global_sum
-   if (p_id == 0) {
-      printf("(%d) sum: %ld\n", p_id, global_sum);
-   }
-
-
    elapsed_time += MPI_Wtime();
+
    if (p_id == 0) {
-      printf("Program finish within %10.6f seconds\n", elapsed_time);
+      printf("INPUT FILE:     %s\n", file_name);
+      printf("N:              %d\n", global_size);
+      printf("COLLAPSE:       %d\n", collapse(global_collapse));
+      printf("PROCESSOR:      %d\n", comm_size);
+      printf("TIME:           %.6f seconds\n", elapsed_time);
    }
 
    // terminate MPI
    MPI_Finalize();
 
    return 0;
+}
+
+int collapse(int number) {
+   while (number >= 10) {
+      int decimal = number % 10;
+      number = (number / 10) + decimal;
+   }
+   return number;
 }
