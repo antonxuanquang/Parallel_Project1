@@ -1,11 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <png.h>
+#include <string.h>
 
 int width, height;
-png_byte color_type;
-png_byte bit_depth;
-png_bytep *row_pointers;
+png_byte 	color_type;
+png_byte 	bit_depth;
+png_bytep 	*row_pointers;
+png_uint_32 row_byte;
 
 void read_png_file(char *filename) {
 	FILE *fp = fopen(filename, "rb");
@@ -26,6 +29,11 @@ void read_png_file(char *filename) {
 	height     = png_get_image_height(png, info);
 	color_type = png_get_color_type(png, info);
 	bit_depth  = png_get_bit_depth(png, info);
+	row_byte   = png_get_rowbytes(png, info);
+
+	printf("width: %d; height: %d\n", width, height);
+	printf("color type: %d; bit_depth: %d\n", color_type, bit_depth);
+	printf("row_byte %u\n", row_byte);
 
 	// Read any color_type into 8bit depth, RGBA format.
 	// See http://www.libpng.org/pub/png/libpng-manual.txt
@@ -117,17 +125,34 @@ void process_png_file() {
 		for(x = 0; x < width; x++) {
 			png_bytep px = &(row[x * 4]);
 			// Do something awesome for each pixel here...
-			printf("%4d, %4d = RGBA(%3d, %3d, %3d, %3d)\n", x, y, px[0], px[1], px[2], px[3]);
+			// printf("%4d, %4d = RGBA(%3d, %3d, %3d, %3d)\n", x, y, px[0], px[1], px[2], px[3]);
 		}
 	}
+}
+
+void read_file(char *filename) {
+	FILE *fp = fopen(filename, "rb");
+	char byte[8];
+	int i;
+	int count = 0;
+	while (fread(byte, 1, 1, fp) == 1) {
+		for (i = 0; i < 8; i++) {
+			printf("%d", !!((byte[0] << i) & 0x80));
+		}
+		printf("\n");
+		count++;
+	}
+	printf("count: %d\n", count);
+
+	fclose(fp);
 }
 
 int main(int argc, char *argv[]) {
 	if(argc != 3) abort();
 
 	read_png_file(argv[1]);
-	process_png_file();
-	write_png_file(argv[2]);
-
+	// process_png_file();
+	// write_png_file(argv[2]);
+	// read_file(argv[1]);
 	return 0;
 }
