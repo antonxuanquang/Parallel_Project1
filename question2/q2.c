@@ -6,13 +6,17 @@
 
 #define MAXLENGTH 100
 
+void append(char subject[], const char insert[], int pos);
+
 int main(int argc, char *argv[]) {
 
 	int 	p_id;						// Processor ID
 	int 	comm_size;					// Number of processors
 	double 	elapsed_time;				// Execution time
 	char 	input_file[MAXLENGTH];		// hold the file name
+	char 	output_file[MAXLENGTH];		// hold the file name
 	FILE 	*in_description;			// hold the file description
+	FILE 	*out_description;			// hold the file description
 	int 	counter;					// just a runner
 	int 	low_index;					// start index of a process
 	int 	high_index;					// end index of a process
@@ -33,16 +37,19 @@ int main(int argc, char *argv[]) {
 	elapsed_time = -MPI_Wtime();
 
 	if (argc != 2) {
-	  if (p_id == 0) printf("Command line: %s <file_name>\n", argv[0]);
+	  if (p_id == 0) printf("Command line: %s <input_image>\n", argv[0]);
 	  MPI_Finalize();
 	  exit(1);
 	}
 
 	// get file name
 	strcpy(input_file, argv[1]);
+	strcpy(output_file, input_file);
+	append(output_file, ".out", strlen(input_file) - 4);
 
 	// open input file
 	in_description = fopen(input_file, "r");
+	out_description = fopen(output_file, "w");
 
 	// read first line
 	getline(&line, &len, in_description);
@@ -96,10 +103,11 @@ int main(int argc, char *argv[]) {
 	}
 	for (counter = 0; counter < size; counter++) {
 		MPI_Recv(line, global_column * 2 - 1, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		printf("(%d) length: %zu, line: %s\n", p_id, strlen(line), line);
+		// printf("(%d) length: %zu, line: %s\n", p_id, strlen(line), line);
 	}
 
     fclose(in_description);
+    fclose(out_description);
 
 	elapsed_time += MPI_Wtime();
 
@@ -112,4 +120,17 @@ int main(int argc, char *argv[]) {
 	MPI_Finalize();
 
 	return 0;
+}
+
+// inserts into subject[] at position pos
+void append(char subject[], const char insert[], int pos) {
+    char buf[MAXLENGTH] = {}; 
+
+    strncpy(buf, subject, pos); // copy at most first pos characters
+    int len = strlen(buf);
+    strcpy(buf+len, insert); // copy all of insert[] at the end
+    len += strlen(insert);  // increase the length by length of insert[]
+    strcpy(buf+len, subject+pos); // copy the rest
+
+    strcpy(subject, buf);   // copy it back to subject
 }
